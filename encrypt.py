@@ -65,8 +65,10 @@ def encrypt_stream(inp_stream,S_table,num_rounds,key_stream):
     print("********************Encrypting***************************************")
     print("Length of input stream bits:",8*len(inp_stream))
     encrypted_stream = []
-    for i in range(len(inp_stream)%16):
+    # padding_req = (8*len(inp_stream)) % 128
+    while ((8*len(inp_stream))%128 != 0):
         inp_stream.append(0)  #Padding of 0 to make divisible by 128
+    print("Length of input stream bits:",8*len(inp_stream))
 
     assert len(key_stream)==4*(num_rounds+1)
 
