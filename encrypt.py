@@ -43,6 +43,13 @@ def get4b4(input_stream,index):
             mat[i][j]=input_stream[index+i+4*j]
     return mat.astype(int)
 
+def get2b2(input_stream,index):
+    mat = np.zeros((2,2))
+    for i in range(2):
+        for j in range(2):
+            mat[i][j]=input_stream[index+i+2*j]
+    return mat.astype(int)
+
 def add_round_key(inp_mat,four_keys):
     q1 = 2**24
     q2 = 2**16
@@ -59,6 +66,147 @@ def add_round_key(inp_mat,four_keys):
         for i in range(4):
             inp_mat[i][j] = inp_mat[i][j] ^ byte[i]
     return inp_mat
+
+def add_round_small_key(inp_mat,kkey):
+    q1 = 2**24
+    q2 = 2**16
+    q3 = 2**8
+    byte = np.zeros((4)).astype(int)
+    # kkey = kkey[0]
+    byte[0] = int(kkey/q1)
+    kkey = kkey%(q1)
+    byte[1] = int(kkey/q2)
+    kkey = kkey % (q2)
+    byte[2] = int(kkey / (q3))
+    byte[3] = kkey % (q3)
+    for i in range(2):
+        for j in range(2):
+            inp_mat[i][j] = inp_mat[i][j] ^ byte[i+2*j]
+    return inp_mat
+
+def encrypt_short_stream(inp_stream,S_table,num_rounds,key_stream):  #32 bit key
+    print("********************Encrypting***************************************")
+    print("Length of input stream bits:",8*len(inp_stream))
+    encrypted_stream = []
+    # padding_req = (8*len(inp_stream)) % 128
+    while ((8*len(inp_stream))%32 != 0):
+        inp_stream.append(0)  #Padding of 0 to make divisible by 32
+    print("Length of input stream bits:",8*len(inp_stream))
+
+    assert len(key_stream)==(num_rounds+1)
+
+    index = 0
+    while(index<len(inp_stream)):
+        i = index
+        inp_mat = get2b2(inp_stream,index)
+        inp_mat = add_round_small_key(inp_mat,key_stream[0])
+        print("After Adding original Key: ",inp_mat)
+        for round in range(num_rounds):
+            print("-----------------------Round "+str(round+1)+"-----------------------------")
+            sub_mat = np.copy(inp_mat)
+
+            print("Input stream in matrix format: ",inp_mat)
+
+            #Substitution step
+            for j in range(2):
+                for k in range(2):
+                    inp_byte = inp_mat[j][k]
+                    sub_mat[j][k] = S_table[inp_byte]
+
+            inp_mat = sub_mat
+
+            print("After Substitution: ",inp_mat)
+
+
+            #Shift Rows step.
+            for i in range(1,len(inp_mat)):
+                #Shift row i times to the left
+                for j in range(i):
+                    temp = inp_mat[i][0]
+                    for k in range(len(inp_mat)-1):
+                        inp_mat[i][k]=inp_mat[i][k+1]
+                    inp_mat[i][k+1]=temp
+
+            print("After Row Shift: ",inp_mat)
+
+            #Mix Columns Step.
+            # mult_mat = [[2,3,1,1],[1,2,3,1],[1,1,2,3],[3,1,1,2]]
+            mult_mat = [[0,1],[1,0]]
+            if round<num_rounds-1:
+                inp_mat = matmul(inp_mat,mult_mat)
+
+            print("After Column Mix: ",inp_mat)
+
+            # inv = [[14,11,13,9],[9,14,11,13],[13,9,14,11],[11,13,9,14]]
+            # inv = [[2,1],[1,2]]
+            # out_mat = matmul(inp_mat,inv)
+            # print("Possible inveser: ",out_mat)
+
+            #Key adding step (Add round Key)
+            inp_mat = add_round_small_key(inp_mat.astype(int),key_stream[round+1])
+
+            print("After Adding round Key: ",inp_mat)
+
+        for j in range(2):
+            for i in range(2):
+                encrypted_stream.append(inp_mat[i][j])
+        index = index + 4
+    return encrypted_stream
+
+def decrypt_short_stream(inp_stream,inv_S_table,num_rounds,key_stream):
+    print("********************Decrypting***************************************")
+    decrypted_stream = []
+    index = 0
+    while(index<len(inp_stream)):
+        i = index
+        inp_mat = get2b2(inp_stream,index)
+        inp_mat = add_round_small_key(inp_mat,key_stream[num_rounds])
+        print("After adding final key: ",inp_mat)
+        # inp_mat = add_round_key(inp_mat,key_stream[4*inverse_round+4:4*inverse_round+8])
+        for round in range(num_rounds):
+            print("-----------------------Round "+str(round+1)+"-----------------------------")
+            inv_round = num_rounds-1-round
+            #Inverse Shift Rows step.
+            for i in range(1,len(inp_mat)):
+                #Shift row i times to the right
+                for j in range(i):
+                    temp = inp_mat[i][len(inp_mat)-1]
+                    for k in range(1,len(inp_mat)):
+                        l = len(inp_mat)-k
+                        inp_mat[i][l]=inp_mat[i][l-1]
+                    inp_mat[i][0]=temp
+            print("After Row Shift: ",inp_mat)
+
+            #Inverse Substitute Bytes step
+            sub_mat = np.copy(inp_mat)
+            #Substitution step
+            for j in range(2):
+                for k in range(2):
+                    inp_byte = inp_mat[j][k]
+                    sub_mat[j][k] = inv_S_table[inp_byte]
+
+            inp_mat = sub_mat
+
+            print("After Substitution: ",inp_mat)
+
+            #Add round Key step
+            inverse_round = num_rounds-round-1
+            # inverse_round = round
+            inp_mat = add_round_small_key(inp_mat,key_stream[inverse_round])
+            print("After Adding round Key: ",inp_mat)
+
+            #Inverse Mix Columns Step.
+            mult_mat = [[0,1],[1,0]]
+            if round<num_rounds-1:
+                inp_mat = matmul(inp_mat,mult_mat)
+
+            print("After Column Mix: ",inp_mat)
+
+        for j in range(2):
+            for i in range(2):
+                decrypted_stream.append(inp_mat[i][j])
+        index = index+4
+    return decrypted_stream
 
 
 def encrypt_stream(inp_stream,S_table,num_rounds,key_stream):

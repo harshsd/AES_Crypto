@@ -39,3 +39,14 @@ def expand_key(key,num_rounds,S_table):
         final_keys.append(w6)
         final_keys.append(w7)
     return final_keys
+
+def expand_small_key(key,num_rounds,S_table):
+    final_keys = list(key)
+    round_const = 1
+    q5 = 2**25
+    for i in range(num_rounds):
+        w = final_keys[-1]
+        w = g(w,S_table,round_const*q5)
+        round_const = 2*round_const
+        final_keys.append(w)
+    return final_keys

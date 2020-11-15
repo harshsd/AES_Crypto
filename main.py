@@ -15,23 +15,31 @@ def convert(s):
 
 [S_table,inv_S_table] = getTables()
 
-Key =[np.random.randint(2**32) for x in range(4)]
-num_rounds = 4
+# Key =[np.random.randint(2**32) for x in range(4)]
+Key = [np.random.randint(2**32) for x in range(1)]
+num_rounds = 2
 
-key_stream = expand_key(Key,num_rounds,S_table)
+# key_stream = expand_key(Key,num_rounds,S_table)
+key_stream = expand_small_key(Key,num_rounds,S_table)
+print(key_stream)
+# exit(0)
 
 print("Key stream is: ",key_stream)
 
-input_stream = [np.random.randint(128) for x in range(32)]  #Input stream with 8 bits(1 byte) at a time
+# input_stream = [np.random.randint(256) for x in range(4)]  #Input stream with 8 bits(1 byte) at a time
 input_string = "Old, but I am not that old. Young, but I am not that bold."
 input_stream = [ord(input_string[i]) for i in range(len(input_string))]
 print("Input Stream is: ",input_stream)
 
 
-encrypt_stream = encrypt_stream(input_stream,S_table,num_rounds,key_stream)
+# encrypt_stream = encrypt_stream(input_stream,S_table,num_rounds,key_stream)
+encrypt_stream = encrypt_short_stream(input_stream,S_table,num_rounds,key_stream)
 encrypted_string = convert([chr(encrypt_stream[i]) for i in range(len(encrypt_stream))])
 
-decrypt_stream = decrypt_stream(encrypt_stream,inv_S_table,num_rounds,key_stream)
+# exit(0)
+
+# decrypt_stream = decrypt_stream(encrypt_stream,inv_S_table,num_rounds,key_stream)
+decrypt_stream = decrypt_short_stream(encrypt_stream,inv_S_table,num_rounds,key_stream)
 decrypted_string = convert([chr(decrypt_stream[i]) for i in range(len(decrypt_stream))])
 
 print("------------------Results---------------------------")
